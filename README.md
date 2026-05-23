@@ -68,6 +68,12 @@ The first feature we examine is **game length**, that is, how long a typical pro
 
 Game lengths cluster around **30 to 32 minutes**, with a long right tail of matches running 40+ minutes. The shape matches the intuition that most pro games end shortly after the first baron buff (available at 20 minutes) snowballs into a base push.
 
+Next we look at the distribution of **gold difference at 15 minutes**, the single most-discussed early-game variable in pro LoL.
+
+<iframe src="assets/02_golddiff15.html" width="840" height="480" frameborder="0"></iframe>
+
+The distribution is roughly symmetric around zero by construction (every gold lead one team has is its opponent's deficit). The bulk of team-rows fall within ±3,000 gold (about 68%), corresponding to small advantages worth roughly one extra kill plus a few extra creep waves. The tails reaching ±8,000+ gold (~2% of team-rows) represent the "stomps" that pros and viewers often complain about.
+
 ### Bivariate analysis
 
 Now we look at how the strongest early-game economic signal, **gold difference at 15 minutes**, relates to the outcome.
@@ -112,7 +118,9 @@ If I instead wanted to argue for NMAR, the additional data I'd need is informati
 
 I analyzed the missingness of `golddiffat15` (about 15% of team-rows are missing it) using permutation tests with two candidate dependency columns.
 
-**Dependency we found.** Missingness of `golddiffat15` **does depend on `gamelength_min`** (observed mean difference ≈ 0.77 minutes, p < 0.001 from 1,000 permutations). Matches missing the timeline tend to be slightly longer than matches with full timelines. This makes sense, since the leagues with `datacompleteness == partial` (notably the LPL and LDL) average longer games on slower-paced patches, and *all* of their timeline data is missing.
+**Dependency we found.** Missingness of `golddiffat15` **does depend on `gamelength_min`** (observed mean difference ≈ 0.77 minutes, p < 0.001 from 1,000 permutations). Matches missing the timeline tend to be slightly longer than matches with full timelines. This makes sense, since the leagues with `datacompleteness == partial` (notably the LPL and LDL) average longer games on slower-paced patches, and *all* of their timeline data is missing. The observed difference falls far outside the null distribution from the permutation test:
+
+<iframe src="assets/05_missingness_null.html" width="840" height="480" frameborder="0"></iframe>
 
 **Independence we found.** Missingness of `golddiffat15` **does not depend on `result`** (observed difference essentially 0, p ≈ 1.0). Win and loss rows are equally likely to be missing, confirming the missingness is structural-by-league, not outcome-dependent.
 
@@ -142,7 +150,7 @@ I used `ckpm` as the operationalization of "action" because it directly captures
 
 ### Result
 
-<iframe src="assets/05_hypothesis_null.html" width="840" height="480" frameborder="0"></iframe>
+<iframe src="assets/06_hypothesis_null.html" width="840" height="480" frameborder="0"></iframe>
 
 - **Tier 1 mean ckpm:** 0.834 (n = 3,492 matches)
 - **Other mean ckpm:** 0.971 (n = 9,037 matches)
@@ -260,6 +268,12 @@ Twelve configurations × 3 folds = 36 fits. The same train/test split as the bas
 
 The final model improved test accuracy from **74.7% to 75.5%**, about a **3% reduction in classification error**.
 
+The confusion matrix on the held-out test set shows the structure of the model's errors:
+
+<iframe src="assets/07_confusion_matrix.html" width="640" height="540" frameborder="0"></iframe>
+
+The model is slightly more accurate predicting blue wins than blue losses (precision 76% vs 75%, recall 78% vs 72%), partly because blue side is the majority class (52% of matches in the held-out set). The asymmetry is small and consistent with a well-calibrated classifier on a near-balanced problem.
+
 Why the improvement isn't larger: gold-diff-at-15 is *already* such a strong feature that the remaining 25% of misclassifications are largely matches where the trailing team mounts a comeback. That's something we fundamentally cannot predict from minute-15 numbers, because those matches "look" exactly like other matches with similar minute-15 stats but happen to flip. The extra features each shave a little error off the margins but can't dissolve this irreducible noise.
 
 The best configuration favored a **moderate tree depth** with **300 trees** and **`min_samples_leaf=5`**, which prevents the model from carving the feature space into tiny noise-fitted regions; the ensemble of 300 such trees then averages out individual-tree variance.
@@ -301,9 +315,12 @@ Test details:
 - **Observed difference (Tier 1 − Other):** −0.0028
 - **Two-sided p-value:** 0.9246
 
+The observed difference sits right in the center of the null distribution, indicating no evidence that the model's accuracy differs by tier:
+
+<iframe src="assets/08_fairness_null.html" width="840" height="480" frameborder="0"></iframe>
+
 ### Conclusion
 
 We **fail to reject H₀** at α = 0.05. The evidence is fully consistent with the model being equally accurate on Tier 1 and Other league matches. This doesn't *prove* the model is perfectly fair (failure to reject is not proof of equivalence), but with 2,661 held-out matches we have enough sample size that a meaningful disparity would have been likely to surface, and none did.
 
 A practical caveat: this fairness check uses the model the way it was trained (one global model across all leagues) and asks whether its accuracy is uniform across the tier dichotomy. Other fairness lenses (calibration parity, false-positive/false-negative balance, or per-league rather than per-tier accuracy) would be useful follow-ups but are outside the scope of this analysis.
-
